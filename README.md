@@ -3,7 +3,7 @@ import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 
-def FindAlternateGroups(store_domain):
+def extract_product_titles(store_domain):
     products_url = f"{store_domain}/collections/all/products.json"
     page = 1
     products = []
@@ -18,30 +18,46 @@ def FindAlternateGroups(store_domain):
         page += 1
 
     titles = [p['title'] for p in products]
+    return titles, products
+
+def cluster_products(titles, num_clusters):
     vectorizer = TfidfVectorizer(stop_words='english')
     X = vectorizer.fit_transform(titles)
 
-    kmeans = KMeans(n_clusters=5, random_state=0).fit(X)
+    kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(X)
     labels = kmeans.labels_
 
     clusters = {}
     for i, label in enumerate(labels):
         if label not in clusters:
             clusters[label] = []
-        clusters[label].append(products[i]['handle'])
+        clusters[label].append(i)
 
+    return clusters
+
+def group_alternates(clusters, products):
     alternates = []
     for cluster in clusters.values():
         if len(cluster) > 1:
-            alternates.append({"product alternates": cluster})
+            current_alternates = [products[i]['handle'] for i in cluster]
+            alternates.append({"product alternates": current_alternates})
+
+    return alternates
+
+def FindAlternateGroups(store_domain, num_clusters):
+    titles, products = extract_product_titles(store_domain)
+    clusters = cluster_products(titles, num_clusters)
+    alternates = group_alternates(clusters, products)
 
     return json.dumps(alternates, indent=4)
 
 store_domain = "https://www.boysnextdoor-apparel.co"
-result = FindAlternateGroups(store_domain)
+num_clusters = 5
+result = FindAlternateGroups(store_domain, num_clusters)
 print(result)
 
-output
+
+Output
 [
     {
         "product alternates": [
